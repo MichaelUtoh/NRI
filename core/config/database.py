@@ -9,6 +9,6 @@ client = motor.motor_asyncio.AsyncIOMotorClient(config("MONGODB_URL"))
 db = client.zen_db
 
 food_collection = db.get_collection("food")
-student_collection = db.get_collection("student")
+user_collection = db.get_collection("accounts")
 
 PyObjectId = Annotated[str, BeforeValidator(str)]

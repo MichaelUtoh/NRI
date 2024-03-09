@@ -6,7 +6,7 @@ from pymongo import ReturnDocument
 from ..models.foods import FoodCollection, FoodModel, UpdateFoodModel
 from ..config.database import food_collection
 
-router = APIRouter()
+router = APIRouter(tags=["Recipes"])
 
 
 @router.post(
