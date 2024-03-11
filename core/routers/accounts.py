@@ -1,31 +1,49 @@
 from bson import ObjectId
 
+import bcrypt
 from fastapi import APIRouter, Body, HTTPException, Response, status
 from pymongo import ReturnDocument
 
 from ..models.accounts import UserCollection, UserModel, UpdateUserModel
+from ..schemas.accounts import RegisterSerializer
+from ..config.auth import AuthHandler
 from ..config.database import user_collection
+from ..config.generics import pwd_strength_checker
 
+auth_handler = AuthHandler()
 router = APIRouter(prefix="/auth/accounts", tags=["Authentication"])
 
 
 @router.post(
-    "/users/",
+    "/register/",
     response_description="Add new user",
-    response_model=UserModel,
+    response_model=RegisterSerializer,
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=False,
 )
-async def create_user(user: UserModel = Body(...)):
-    new_user = await user_collection.insert_one(
-        user.model_dump(by_alias=True, exclude=["id"])
-    )
+async def register(user: UserModel = Body(...)):
+    if await user_collection.find_one({"email": user.email}):
+        raise HTTPException(status_code=400, detail="Email already exists.")
+
+    if not pwd_strength_checker(user):
+        raise HTTPException(status_code=400, detail="Password is not strong enough!")
+
+    salt = bcrypt.gensalt()
+    hashed_pwd = bcrypt.hashpw(user.password.encode("utf-8"), salt)
+    data = {"email": user.email.lower(), "password": hashed_pwd}
+    new_user = await user_collection.insert_one(data)
     created_user = await user_collection.find_one({"_id": new_user.inserted_id})
-    return created_user
+
+    payload = {
+        "email": created_user["email"],
+        "access_token": auth_handler.encode_token(user.email),
+        "refresh_token": auth_handler.encode_refresh_token(user.email),
+    }
+    return payload
 
 
 @router.get(
-    "/users/",
+    "/users/all/",
     response_description="List all users",
     response_model=UserCollection,
     response_model_by_alias=False,
